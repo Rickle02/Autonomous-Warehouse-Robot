@@ -30,15 +30,24 @@ class Warehouse:
             robot.position = (new_x, new_y)
 
     def display(self):
-        # Create a copy of grid to add robot positions
-        display_grid = [row[:] for row in self.grid]
+        # Create a fresh empty grid to display (without modifying original)
+        display_grid = []
+        for i in range(len(self.grid)):
+            row = []
+            for j in range(len(self.grid[0])):
+                cell = self.grid[i][j]
+                row.append(cell)
+            display_grid.append(row)
 
+        # Now place the robots
         for robot in self.robots:
             x, y = robot.position
-            display_grid[x][y] = 'R'  # Mark robot position
+            display_grid[x][y] = 'R'
 
+        # Print the display grid nicely
         for row in display_grid:
             print(' '.join(row))
+        print()  # blank line after displaying
 
     def get_cell(self, x, y):
         if 0 <= x < len(self.grid) and 0 <= y < len(self.grid[0]):

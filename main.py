@@ -1,5 +1,6 @@
 from environment.warehouse import Warehouse
 from agents.robot_agent import RobotAgent
+import time
 
 def main():
     # Define the warehouse grid
@@ -20,18 +21,15 @@ def main():
     # Add the robot to the warehouse
     warehouse.add_robot(robot1)
 
-    # Display initial warehouse
-    warehouse.display()
+    # Target goal (pickup point 'P') is at (0, 6)
+    goal = (0, 6)
 
     print("\nMoving robot...")
-    # Example moves
-    robot1.move('right', warehouse)
-    robot1.move('right', warehouse)
-    robot1.move('up', warehouse)
-    robot1.move('up', warehouse)
-
-    # Display warehouse after movement
-    warehouse.display()
+    # Move step by step towards goal
+    while robot1.position != goal:
+        robot1.move_towards(goal, warehouse)
+        warehouse.display()
+        time.sleep(0.5)  # Optional: slow down to see movement
 
 if __name__ == "__main__":
     main()
