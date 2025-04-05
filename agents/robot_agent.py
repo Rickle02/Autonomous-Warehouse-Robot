@@ -1,3 +1,5 @@
+from collections import deque
+
 class RobotAgent:
     def __init__(self, x, y, color, pickup, dropoff):
         self.x = x
@@ -7,47 +9,46 @@ class RobotAgent:
         self.dropoff = dropoff
         self.carrying = False
         self.phase = 'to_pickup'  # 'to_pickup', 'to_dropoff', 'done'
+        self.path = []  # path found using BFS
+
+    def bfs(self, warehouse, target): # Breadth first search method
+        queue = deque()
+        queue.append((self.x, self.y, []))
+        visited = set()
+        visited.add((self.x, self.y))
+
+        while queue:
+            x, y, path = queue.popleft()
+
+            if (x, y) == target:
+                return path
+
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < warehouse.rows and 0 <= ny < warehouse.cols:
+                    if (nx, ny) not in warehouse.shelves and (nx, ny) not in visited:
+                        queue.append((nx, ny, path + [(nx, ny)]))
+                        visited.add((nx, ny))
+        return []
 
     def move_one_step(self, warehouse):
-        target = self.pickup if self.phase == 'to_pickup' else self.dropoff
-        tx, ty = target
-
-        possible_moves = []
-
-        # Try preferred directions first (based on target)
-        if self.x < tx:
-            possible_moves.append((self.x + 1, self.y))  # move down
-        elif self.x > tx:
-            possible_moves.append((self.x - 1, self.y))  # move up
-
-        if self.y < ty:
-            possible_moves.append((self.x, self.y + 1))  # move right
-        elif self.y > ty:
-            possible_moves.append((self.x, self.y - 1))  # move left
-
-        # Add alternative directions (not preferred but still valid)
-        if (self.x + 1, self.y) not in possible_moves:
-            possible_moves.append((self.x + 1, self.y))
-        if (self.x - 1, self.y) not in possible_moves:
-            possible_moves.append((self.x - 1, self.y))
-        if (self.x, self.y + 1) not in possible_moves:
-            possible_moves.append((self.x, self.y + 1))
-        if (self.x, self.y - 1) not in possible_moves:
-            possible_moves.append((self.x, self.y - 1))
-
-        # Move to the first non-obstacle cell found
-        for new_x, new_y in possible_moves:
-            if 0 <= new_x < warehouse.rows and 0 <= new_y < warehouse.cols:
-                if (new_x, new_y) not in warehouse.shelves:
-                    self.x, self.y = new_x, new_y
-                    break
-
-        # After moving, check if arrived
-        if (self.x, self.y) == target:
+        if not self.path:
             if self.phase == 'to_pickup':
-                self.carrying = True
-                self.phase = 'to_dropoff'
+                self.path = self.bfs(warehouse, self.pickup)
             elif self.phase == 'to_dropoff':
-                self.carrying = False
-                self.phase = 'done'
+                self.path = self.bfs(warehouse, self.dropoff)
+
+        if self.path:
+            next_pos = self.path.pop(0)
+            self.x, self.y = next_pos
+
+        # Check arrival
+        if (self.x, self.y) == self.pickup and self.phase == 'to_pickup':
+            self.carrying = True
+            self.phase = 'to_dropoff'
+            self.path = []  # reset path for next target
+        elif (self.x, self.y) == self.dropoff and self.phase == 'to_dropoff':
+            self.carrying = False
+            self.phase = 'done'
+            self.path = []
 
