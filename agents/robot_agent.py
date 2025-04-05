@@ -3,8 +3,9 @@ import random
 class RobotAgent:
     def __init__(self, name, start_pos):
         self.name = name
-        self.position = start_pos  # (x, y) coordinates
+        self.position = start_pos
         self.carrying_item = False
+        self.phase = "pickup"
 
     def sense(self, environment):
         x, y = self.position
@@ -19,36 +20,18 @@ class RobotAgent:
     def drop_item(self):
         self.carrying_item = False
 
-    def move_towards(self, goal, warehouse):
+    def move_one_step_towards(self, goal, warehouse):
         goal_x, goal_y = goal
         curr_x, curr_y = self.position
 
-        moves = []
-
-        if curr_x > goal_x:
-            moves.append('up')
-        elif curr_x < goal_x:
-            moves.append('down')
-
-        if curr_y > goal_y:
-            moves.append('left')
-        elif curr_y < goal_y:
-            moves.append('right')
-
-        random.shuffle(moves)  # Randomize preferred moves
-
-        for move in moves:
-            if self.can_move(move, warehouse):
-                self.move(move, warehouse)
-                return
-
-        # Try random moves if preferred blocked
-        directions = ['up', 'down', 'left', 'right']
-        random.shuffle(directions)
-        for move in directions:
-            if self.can_move(move, warehouse):
-                self.move(move, warehouse)
-                return
+        if curr_x > goal_x and self.can_move('up', warehouse):
+            self.move('up', warehouse)
+        elif curr_x < goal_x and self.can_move('down', warehouse):
+            self.move('down', warehouse)
+        elif curr_y > goal_y and self.can_move('left', warehouse):
+            self.move('left', warehouse)
+        elif curr_y < goal_y and self.can_move('right', warehouse):
+            self.move('right', warehouse)
 
     def can_move(self, direction, warehouse):
         x, y = self.position
@@ -69,19 +52,12 @@ class RobotAgent:
         x, y = self.position
         cell = warehouse.get_cell(x, y)
         if cell == 'P' and not self.carrying_item:
-            print(f"{self.name} picked up an item at {self.position}!")
             self.pick_item()
+            self.phase = "dropoff"
 
     def check_dropoff(self, warehouse):
         x, y = self.position
         cell = warehouse.get_cell(x, y)
         if cell == 'D' and self.carrying_item:
-            print(f"{self.name} dropped off the item at {self.position}!")
             self.drop_item()
-
-            # After dropping, move one step away to clear space
-            directions = ['up', 'down', 'left', 'right']
-            for move in directions:
-                if self.can_move(move, warehouse):
-                    self.move(move, warehouse)
-                    break
+            self.phase = "done"

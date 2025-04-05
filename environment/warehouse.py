@@ -1,19 +1,32 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
 class Warehouse:
-    def __init__(self, grid):
+    def __init__(self, grid, ax):
         self.grid = grid
-        self.robots = []  # list of robots in the warehouse
+        self.robots = []
+        self.ax = ax
 
     def add_robot(self, robot):
         self.robots.append(robot)
 
+    def get_cell(self, x, y):
+        return self.grid[x][y]
+
     def is_valid_move(self, x, y):
-        if x < 0 or x >= len(self.grid) or y < 0 or y >= len(self.grid[0]):
-            return False
-        if self.grid[x][y] == 'S':
-            return False
-        if self.is_cell_occupied(x, y):
-            return False
-        return True
+        if 0 <= x < len(self.grid) and 0 <= y < len(self.grid[0]):
+            if self.grid[x][y] != 'S':
+                for robot in self.robots:
+                    if robot.position == (x, y):
+                        return False
+                return True
+        return False
+
+    def is_cell_occupied(self, x, y):
+        for robot in self.robots:
+            if robot.position == (x, y):
+                return True
+        return False
 
     def move_robot(self, robot, direction):
         x, y = robot.position
@@ -26,38 +39,39 @@ class Warehouse:
         elif direction == 'right':
             new_x, new_y = x, y + 1
         else:
-            return  # invalid direction
+            new_x, new_y = x, y
 
         if self.is_valid_move(new_x, new_y):
             robot.position = (new_x, new_y)
 
-    def display(self):
-        # Create a fresh empty grid to display (without modifying original)
-        display_grid = []
-        for i in range(len(self.grid)):
-            row = []
-            for j in range(len(self.grid[0])):
+    def render(self):
+        self.ax.clear()
+
+        nrows, ncols = len(self.grid), len(self.grid[0])
+        warehouse_map = np.ones((nrows, ncols, 3))
+
+        for i in range(nrows):
+            for j in range(ncols):
                 cell = self.grid[i][j]
-                row.append(cell)
-            display_grid.append(row)
+                if cell == 'S':
+                    warehouse_map[i, j] = [0.4, 0.2, 0.8]
+                elif cell == 'P':
+                    warehouse_map[i, j] = [0.0, 0.8, 0.0]
+                elif cell == 'D':
+                    warehouse_map[i, j] = [0.8, 0.0, 0.0]
 
-        # Now place the robots
+        self.ax.imshow(warehouse_map, extent=[0, ncols, nrows, 0])
+
+        for x in range(ncols + 1):
+            self.ax.axvline(x, color='black', linewidth=0.5)
+        for y in range(nrows + 1):
+            self.ax.axhline(y, color='black', linewidth=0.5)
+
         for robot in self.robots:
-            x, y = robot.position
-            display_grid[x][y] = 'R'
+            rx, ry = robot.position
+            self.ax.text(ry + 0.5, rx + 0.5, robot.name, color='black',
+                         ha='center', va='center', fontsize=8, fontweight='bold')
 
-        # Print the display grid nicely
-        for row in display_grid:
-            print(' '.join(row))
-        print()  # blank line after displaying
-
-    def get_cell(self, x, y):
-        if 0 <= x < len(self.grid) and 0 <= y < len(self.grid[0]):
-            return self.grid[x][y]
-        return None
-
-    def is_cell_occupied(self, x, y):
-        for robot in self.robots:
-            if robot.position == (x, y):
-                return True
-        return False
+        self.ax.set_xticks([])
+        self.ax.set_yticks([])
+        self.ax.set_title("Warehouse Robot Simulation")
