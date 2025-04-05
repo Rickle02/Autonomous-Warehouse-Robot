@@ -11,7 +11,7 @@ class RobotAgent:
         self.phase = 'to_pickup'  # 'to_pickup', 'to_dropoff', 'done'
         self.path = []  # path found using BFS
 
-    def bfs(self, warehouse, target): # Breadth first search method
+    def bfs(self, warehouse, target):
         queue = deque()
         queue.append((self.x, self.y, []))
         visited = set()
@@ -42,13 +42,11 @@ class RobotAgent:
             next_pos = self.path.pop(0)
             self.x, self.y = next_pos
 
-        # Check arrival
         if (self.x, self.y) == self.pickup and self.phase == 'to_pickup':
             self.carrying = True
             self.phase = 'to_dropoff'
-            self.path = []  # reset path for next target
+            self.path = []
         elif (self.x, self.y) == self.dropoff and self.phase == 'to_dropoff':
             self.carrying = False
             self.phase = 'done'
             self.path = []
-

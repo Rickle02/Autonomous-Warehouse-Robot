@@ -1,0 +1,15 @@
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+_ _ S S S _ S S S _ S S S _ _
+_ P S S S _ S S S _ S S S _ _
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+_ _ S S S _ S S S _ S S S _ _
+_ _ S S S _ S S S _ S S S _ _
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+_ _ S S S _ S S S _ S S S _ _
+_ _ S S S _ S S S _ S S S _ _
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+_ _ S S S _ S S S _ S S S _ _
+_ _ S S S _ S S S _ S S S _ _
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+_ _ S S S _ S S S _ S S S _ _
+_ _ _ _ _ _ _ _ _ _ _ _ D _ _

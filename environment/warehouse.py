@@ -15,37 +15,31 @@ class Warehouse:
         self.MAGENTA = (255, 0, 255)
         self.DARK_GRAY = (100, 100, 100)
 
-        # Create shelves layout (organized rows)
-        self.shelves = []
-
-        for row in [1,2,4,5,7,8,10,11,13]:
-            for col in [2,3,4,6,7,8,10,11,12]:
-                self.shelves.append((row, col))
+        self.shelves = []  # shelves will be assigned later dynamically
 
     def draw(self, robots):
-        self.screen.fill(self.WHITE)
-
-        # Draw grid
-        for x in range(0, self.cols * self.tile_size, self.tile_size):
-            for y in range(0, self.rows * self.tile_size, self.tile_size):
-                rect = pygame.Rect(x, y, self.tile_size, self.tile_size)
+        for i in range(self.rows):
+            for j in range(self.cols):
+                rect = pygame.Rect(j * self.tile_size, i * self.tile_size, self.tile_size, self.tile_size)
+                pygame.draw.rect(self.screen, self.WHITE, rect)
                 pygame.draw.rect(self.screen, self.GRAY, rect, 1)
 
-        # Draw shelves (obstacles)
-        for sx, sy in self.shelves:
-            pygame.draw.rect(self.screen, self.DARK_GRAY, (sy * self.tile_size, sx * self.tile_size, self.tile_size, self.tile_size))
+        # Draw shelves
+        for (i, j) in self.shelves:
+            rect = pygame.Rect(j * self.tile_size, i * self.tile_size, self.tile_size, self.tile_size)
+            pygame.draw.rect(self.screen, self.DARK_GRAY, rect)
 
-        # Draw pickup and dropoff
-        px, py = self.pickup_point
-        dx, dy = self.dropoff_point
-        pygame.draw.rect(self.screen, self.CYAN, (py * self.tile_size, px * self.tile_size, self.tile_size, self.tile_size))
-        pygame.draw.rect(self.screen, self.MAGENTA, (dy * self.tile_size, dx * self.tile_size, self.tile_size, self.tile_size))
+        # Draw pickup
+        pi, pj = self.pickup_point
+        pickup_rect = pygame.Rect(pj * self.tile_size, pi * self.tile_size, self.tile_size, self.tile_size)
+        pygame.draw.rect(self.screen, self.CYAN, pickup_rect)
+
+        # Draw dropoff
+        di, dj = self.dropoff_point
+        dropoff_rect = pygame.Rect(dj * self.tile_size, di * self.tile_size, self.tile_size, self.tile_size)
+        pygame.draw.rect(self.screen, self.MAGENTA, dropoff_rect)
 
         # Draw robots
         for robot in robots:
-            pygame.draw.circle(
-                self.screen,
-                robot.color,
-                (robot.y * self.tile_size + self.tile_size // 2, robot.x * self.tile_size + self.tile_size // 2),
-                self.tile_size // 3
-            )
+            pygame.draw.circle(self.screen, robot.color, (robot.y * self.tile_size + self.tile_size // 2,
+                                                           robot.x * self.tile_size + self.tile_size // 2), self.tile_size // 3)
