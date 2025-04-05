@@ -7,11 +7,13 @@ class Warehouse:
         self.robots.append(robot)
 
     def is_valid_move(self, x, y):
-        # Check if x, y are within bounds
         if x < 0 or x >= len(self.grid) or y < 0 or y >= len(self.grid[0]):
             return False
-        # Check if the cell is not a shelf ('S')
-        return self.grid[x][y] != 'S'
+        if self.grid[x][y] == 'S':
+            return False
+        if self.is_cell_occupied(x, y):
+            return False
+        return True
 
     def move_robot(self, robot, direction):
         x, y = robot.position
@@ -53,3 +55,9 @@ class Warehouse:
         if 0 <= x < len(self.grid) and 0 <= y < len(self.grid[0]):
             return self.grid[x][y]
         return None
+
+    def is_cell_occupied(self, x, y):
+        for robot in self.robots:
+            if robot.position == (x, y):
+                return True
+        return False
