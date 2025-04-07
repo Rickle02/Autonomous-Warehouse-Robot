@@ -1,16 +1,14 @@
 import pygame
-from environment.warehouse import Warehouse
-from agents.robot_agent import RobotAgent
 import sys
 import os
+from environment.warehouse import Warehouse
+from agents.robot_agent import RobotAgent
 
 # Settings
 tile_size = 40
 rows, cols = 15, 15
 info_panel_width = 200
 fps = 5
-
-SEARCH_METHOD = 'bfs'
 
 def load_layout(file_path):
     shelves = []
@@ -68,6 +66,50 @@ def show_menu(screen, clock):
 
     return choice
 
+def choose_search_method(screen, clock):
+    font = pygame.font.SysFont(None, 48)
+    small_font = pygame.font.SysFont(None, 36)
+    running = True
+    method = None
+
+    while running:
+        screen.fill((255, 255, 255))
+
+        title = font.render("Choose Search Method", True, (0, 0, 0))
+        option1 = small_font.render("Press 1 for BFS", True, (0, 0, 0))
+        option2 = small_font.render("Press 2 for DFS", True, (0, 0, 0))
+        option3 = small_font.render("Press 3 for Greedy", True, (0, 0, 0))
+        option4 = small_font.render("Press 4 for A*", True, (0, 0, 0))
+
+        screen.blit(title, (100, 50))
+        screen.blit(option1, (140, 150))
+        screen.blit(option2, (140, 200))
+        screen.blit(option3, (140, 250))
+        screen.blit(option4, (140, 300))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    method = 'bfs'
+                    running = False
+                elif event.key == pygame.K_2:
+                    method = 'dfs'
+                    running = False
+                elif event.key == pygame.K_3:
+                    method = 'greedy'
+                    running = False
+                elif event.key == pygame.K_4:
+                    method = 'astar'
+                    running = False
+
+        pygame.display.flip()
+        clock.tick(60)
+
+    return method
+
 def main():
     pygame.init()
     window_width = cols * tile_size + info_panel_width
@@ -76,77 +118,81 @@ def main():
     pygame.display.set_caption("Warehouse Project 15x15")
     clock = pygame.time.Clock()
 
-    choice = show_menu(screen, clock)
-    layout_file = os.path.join("layouts", f"layout{choice}.txt")
-    shelves, pickup_point, dropoff_point, rest_places = load_layout(layout_file)
+    while True:
+        choice = show_menu(screen, clock)
+        layout_file = os.path.join("layouts", f"layout{choice}.txt")
+        shelves, pickup_point, dropoff_point, rest_places = load_layout(layout_file)
+        search_method = choose_search_method(screen, clock)
 
-    warehouse = Warehouse(screen, tile_size, pickup_point, dropoff_point, rows, cols)
-    warehouse.shelves = shelves
-    warehouse.rest_places = rest_places
+        warehouse = Warehouse(screen, tile_size, pickup_point, dropoff_point, rows, cols)
+        warehouse.shelves = shelves
+        warehouse.rest_places = rest_places
 
-    robots = []
-    robot_colors = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
+        robots = []
+        robot_colors = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
+        for i in range(len(robot_colors)):
+            if i < len(rest_places):
+                robots.append(RobotAgent(rest_places[i], robot_colors[i], pickup_point, dropoff_point, method=search_method))
 
-    for i in range(len(robot_colors)):
-        if i < len(rest_places):
-            robots.append(RobotAgent(rest_places[i], robot_colors[i], pickup_point, dropoff_point, method=SEARCH_METHOD))
+        frame_count = 0
+        running = True
 
-    frame_count = 0
-    running = True
+        while running:
+            clock.tick(fps)
+            all_done = all(robot.phase == 'done' for robot in robots)
+            if not all_done:
+                frame_count += 1
 
-    while running:
-        clock.tick(fps)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.KEYDOWN:
+                    if all_done and event.key == pygame.K_r:
+                        running = False
 
-        all_done = all(robot.phase == 'done' for robot in robots)
-        if not all_done:
-            frame_count += 1
+            screen.fill((255, 255, 255))
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+            robots_sorted = sorted(robots, key=lambda r: (r.x, r.y))
+            planned_moves = {}
+            occupied_positions = {(r.x, r.y) for r in robots}
 
-        screen.fill((255, 255, 255))
+            for robot in robots_sorted:
+                if robot.phase != 'done':
+                    current_pos = (robot.x, robot.y)
+                    next_pos = robot.get_action(current_pos, warehouse, robots)
+                    if next_pos not in occupied_positions:
+                        planned_moves[robot] = next_pos
+                        occupied_positions.add(next_pos)
+                    else:
+                        planned_moves[robot] = current_pos
 
-        robots_sorted = sorted(robots, key=lambda r: (r.x, r.y))
-        planned_moves = {}
-        reserved_tiles = {(r.x, r.y) for r in robots}
+            for robot in robots_sorted:
+                next_pos = planned_moves.get(robot, (robot.x, robot.y))
+                robot.x, robot.y = next_pos
 
-        for robot in robots_sorted:
-            if robot.phase != 'done':
-                current_pos = (robot.x, robot.y)
-                next_pos = robot.get_action(current_pos, warehouse, robots)
-                if next_pos not in reserved_tiles:
-                    planned_moves[robot] = next_pos
-                    reserved_tiles.add(next_pos)
-                else:
-                    planned_moves[robot] = current_pos
+            for robot in robots:
+                robot.update_phase(warehouse)
 
-        for robot in robots_sorted:
-            next_pos = planned_moves.get(robot, (robot.x, robot.y))
-            robot.x, robot.y = next_pos
+            warehouse.draw(robots)
 
-        for robot in robots:
-            robot.update_phase(warehouse)
+            pygame.draw.rect(screen, (255, 255, 255), (cols * tile_size, 0, info_panel_width, rows * tile_size))
+            font = pygame.font.SysFont(None, 30)
+            steps_text = font.render(f"Steps: {frame_count}", True, (0, 0, 0))
+            real_time_text = font.render(f"Real Time: {frame_count / fps:.2f} sec", True, (0, 0, 0))
+            items_delivered_text = font.render(f"Items Delivered: {4 - warehouse.packages_to_deliver}", True, (0, 0, 0))
 
-        warehouse.draw(robots)
+            screen.blit(steps_text, (cols * tile_size + 10, 20))
+            screen.blit(real_time_text, (cols * tile_size + 10, 60))
+            screen.blit(items_delivered_text, (cols * tile_size + 10, 100))
 
-        pygame.draw.rect(screen, (255, 255, 255), (cols * tile_size, 0, info_panel_width, rows * tile_size))
-        font = pygame.font.SysFont(None, 30)
-        steps_text = font.render(f"Steps: {frame_count}", True, (0, 0, 0))
-        real_time_text = font.render(f"Real Time: {frame_count / fps:.2f} sec", True, (0, 0, 0))
-        items_delivered_text = font.render(f"Items Delivered: {4 - warehouse.packages_to_deliver}", True, (0, 0, 0))
+            if all_done:
+                done_text = font.render("Simulation Completed!", True, (0, 150, 0))
+                screen.blit(done_text, (cols * tile_size + 10, 140))
+                restart_text = font.render("Press R to Restart", True, (150, 0, 0))
+                screen.blit(restart_text, (cols * tile_size + 10, 180))
 
-        screen.blit(steps_text, (cols * tile_size + 10, 20))
-        screen.blit(real_time_text, (cols * tile_size + 10, 60))
-        screen.blit(items_delivered_text, (cols * tile_size + 10, 100))
-
-        if all_done:
-            done_text = font.render("Simulation Completed!", True, (0, 150, 0))
-            screen.blit(done_text, (cols * tile_size + 10, 140))
-
-        pygame.display.flip()
-
-    pygame.quit()
+            pygame.display.flip()
 
 if __name__ == "__main__":
     main()
