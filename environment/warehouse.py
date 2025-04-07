@@ -1,45 +1,54 @@
 import pygame
 
 class Warehouse:
-    def __init__(self, screen, tile_size, pickup_point, dropoff_point, rows=15, cols=15):
+    def __init__(self, screen, tile_size, pickup_point, dropoff_point, rows, cols):
         self.screen = screen
         self.tile_size = tile_size
         self.pickup_point = pickup_point
         self.dropoff_point = dropoff_point
         self.rows = rows
         self.cols = cols
-
-        self.WHITE = (255, 255, 255)
-        self.GRAY = (200, 200, 200)
-        self.CYAN = (0, 255, 255)
-        self.MAGENTA = (255, 0, 255)
-        self.DARK_GRAY = (100, 100, 100)
-
-        self.shelves = []  # shelves will be assigned later dynamically
+        self.shelves = []
+        self.rest_places = []
+        self.packages_to_deliver = 4  # 4 items to deliver initially
 
     def draw(self, robots):
         for i in range(self.rows):
             for j in range(self.cols):
                 rect = pygame.Rect(j * self.tile_size, i * self.tile_size, self.tile_size, self.tile_size)
-                pygame.draw.rect(self.screen, self.WHITE, rect)
-                pygame.draw.rect(self.screen, self.GRAY, rect, 1)
+                if (i, j) in self.shelves:
+                    pygame.draw.rect(self.screen, (100, 100, 100), rect)  # Shelf - gray
+                elif (i, j) == self.pickup_point:
+                    pygame.draw.rect(self.screen, (0, 255, 255), rect)  # Pickup - cyan
+                elif (i, j) == self.dropoff_point:
+                    pygame.draw.rect(self.screen, (255, 0, 255), rect)  # Dropoff - magenta
+                elif (i, j) in self.rest_places:
+                    pygame.draw.rect(self.screen, (180, 255, 180), rect)  # Resting areas - light green
+                else:
+                    pygame.draw.rect(self.screen, (255, 255, 255), rect)  # Empty floor - white
 
-        # Draw shelves
-        for (i, j) in self.shelves:
-            rect = pygame.Rect(j * self.tile_size, i * self.tile_size, self.tile_size, self.tile_size)
-            pygame.draw.rect(self.screen, self.DARK_GRAY, rect)
+                pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)  # Draw grid
 
-        # Draw pickup
-        pi, pj = self.pickup_point
-        pickup_rect = pygame.Rect(pj * self.tile_size, pi * self.tile_size, self.tile_size, self.tile_size)
-        pygame.draw.rect(self.screen, self.CYAN, pickup_rect)
-
-        # Draw dropoff
-        di, dj = self.dropoff_point
-        dropoff_rect = pygame.Rect(dj * self.tile_size, di * self.tile_size, self.tile_size, self.tile_size)
-        pygame.draw.rect(self.screen, self.MAGENTA, dropoff_rect)
-
-        # Draw robots
         for robot in robots:
-            pygame.draw.circle(self.screen, robot.color, (robot.y * self.tile_size + self.tile_size // 2,
-                                                           robot.x * self.tile_size + self.tile_size // 2), self.tile_size // 3)
+            pygame.draw.circle(
+                self.screen,
+                robot.color,
+                (robot.y * self.tile_size + self.tile_size // 2, robot.x * self.tile_size + self.tile_size // 2),
+                self.tile_size // 3
+            )
+
+    def get_neighbors(self, pos):
+        neighbors = []
+        x, y = pos
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.rows and 0 <= ny < self.cols:
+                if (nx, ny) not in self.shelves:
+                    neighbors.append((nx, ny))
+        return neighbors
+
+    def is_occupied(self, pos, robots):
+        for robot in robots:
+            if (robot.x, robot.y) == pos:
+                return True
+        return False
