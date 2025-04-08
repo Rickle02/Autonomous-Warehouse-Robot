@@ -164,7 +164,7 @@ def main():
         if running_mode == 1:
             warehouse.place_initial_items(30)
         elif running_mode == 2:
-            warehouse.place_initial_items(len(warehouse.shelves))  # Fill all shelves!!
+            warehouse.place_initial_items(len(warehouse.shelves))
         else:
             warehouse.place_initial_items(0)
 
@@ -174,14 +174,11 @@ def main():
         for i in range(4):
             start_pos = rest_places[i] if i < len(rest_places) else (0, 0)
             robot = RobotAgent(start_pos, colors[i], pickup_point, dropoff_point, method=search_method, running_mode=running_mode)
-
-            robot.status_text = "Idle"
             robots.append(robot)
 
         frame_count = 0
         stop_pressed = False
         font = pygame.font.SysFont(None, 30)
-
         simulation_done = False
 
         while not simulation_done:
@@ -225,28 +222,28 @@ def main():
             steps_text = font.render(f"Steps: {frame_count}", True, (0, 0, 0))
             real_time_text = font.render(f"Real Time: {frame_count / fps:.2f} sec", True, (0, 0, 0))
             items_delivered_text = font.render(f"Items Delivered: {warehouse.items_delivered}", True, (0, 0, 0))
+            pickup_count_text = font.render(f"Pickup Point Items Waiting: {len(warehouse.pickup_queue)}", True,(0, 0, 0))
+            live_items_text = font.render(f"Live Items in Shelves: {warehouse.count_live_items()}", True, (0, 0, 0))
 
             screen.blit(steps_text, (cols * tile_size + 10, 20))
             screen.blit(real_time_text, (cols * tile_size + 10, 60))
             screen.blit(items_delivered_text, (cols * tile_size + 10, 100))
+            screen.blit(pickup_count_text, (cols * tile_size + 10, 140))
+            screen.blit(live_items_text, (cols * tile_size + 10, 180))
 
-            mode_name = {1: "Picking up 30 Items, and 30 Items already in Shelves", 2: "Picking up 60 Items (Having Rest)", 3: "Unlimited Items"}
-            mode_text = font.render(f"Mode: {mode_name[running_mode]}", True, (0, 0, 0))
-            screen.blit(mode_text, (cols * tile_size + 10, 140))
-
-            if running_mode == 3:
-                pygame.draw.rect(screen, (255, 0, 0), (window_width - 150, 20, 100, 40))
-                stop_text = font.render("STOP", True, (255, 255, 255))
-                screen.blit(stop_text, (window_width - 125, 25))
-
-            y_offset = 190
+            y_offset = 230
             for idx, robot in enumerate(robots):
                 screen.blit(font.render(f"Robot {idx+1}: {robot.status_text}", True, (0, 0, 0)), (cols * tile_size + 10, y_offset))
                 y_offset += 30
                 screen.blit(font.render(f"- Pickup to Shelf: {robot.pickup_count}", True, (0, 0, 0)), (cols * tile_size + 20, y_offset))
                 y_offset += 30
-                screen.blit(font.render(f"- Shelf to Dropoff: {robot.shelf_delivery_count}", True, (0, 0, 0)),(cols * tile_size + 20, y_offset))
+                screen.blit(font.render(f"- Shelf to Dropoff: {robot.shelf_delivery_count}", True, (0, 0, 0)), (cols * tile_size + 20, y_offset))
                 y_offset += 40
+
+            if running_mode == 3:
+                pygame.draw.rect(screen, (255, 0, 0), (window_width - 150, 20, 100, 40))
+                stop_text = font.render("STOP", True, (255, 255, 255))
+                screen.blit(stop_text, (window_width - 125, 25))
 
             pygame.display.flip()
 

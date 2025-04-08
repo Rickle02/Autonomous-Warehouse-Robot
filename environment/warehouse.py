@@ -10,15 +10,28 @@ class Warehouse:
         self.rows = rows
         self.cols = cols
         self.shelves = []
+        self.reserved_items = {}  # NEW: Track reservations
         self.rest_places = []
         self.items = {}  # Dict (shelf pos -> True/False)
         self.items_delivered = 0
+
+        self.pickup_queue = []
 
     def place_initial_items(self, num_items):
         available_shelves = self.shelves.copy()
         random.shuffle(available_shelves)
         for shelf in available_shelves[:num_items]:
             self.items[shelf] = True
+
+    def add_pickup_item(self):
+        self.pickup_queue.append(1)
+
+    def pickup_item_done(self):
+        if self.pickup_queue:
+            self.pickup_queue.pop()
+
+    def count_live_items(self):
+        return sum(1 for val in self.items.values() if val)
 
     def draw(self, robots):
         for i in range(self.rows):
@@ -50,11 +63,8 @@ class Warehouse:
             if 0 <= nx < self.rows and 0 <= ny < self.cols:
                 next_pos = (nx, ny)
 
-                # BLOCK shelf to shelf move
                 if pos in self.shelves and next_pos in self.shelves:
                     continue
-
-                # BLOCK entering shelf unless allowed phase
                 if next_pos in self.shelves and robot_phase not in ['store_in_shelf', 'pickup_from_shelf']:
                     continue
 
@@ -74,7 +84,7 @@ class Warehouse:
         return None
 
     def find_filled_shelf(self):
-        filled_shelves = [s for s in self.shelves if self.items.get(s, False)]
+        filled_shelves = [s for s in self.shelves if self.items.get(s, False) and s not in self.reserved_items]
         if filled_shelves:
             return random.choice(filled_shelves)
         return None
@@ -83,4 +93,19 @@ class Warehouse:
         self.items[pos] = True
 
     def remove_item(self, pos):
-        self.items[pos] = False
+        if pos in self.items:
+            self.items[pos] = False
+            self.unreserve_item(pos)
+
+    def pickup_items_count(self):
+        return len(self.pickup_queue)
+
+    def live_items_in_shelves(self):
+        return sum(1 for shelf in self.shelves if self.items.get(shelf, False))
+
+    def reserve_item(self, pos, robot_id):
+        self.reserved_items[pos] = robot_id
+
+    def unreserve_item(self, pos):
+        if pos in self.reserved_items:
+            del self.reserved_items[pos]
