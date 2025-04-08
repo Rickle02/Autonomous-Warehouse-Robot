@@ -73,18 +73,41 @@ def show_option_menu(screen, clock, title_text, options, values):
     return result
 
 
-def show_restart_menu(screen, clock):
+def show_restart_menu(screen, clock, frame_count, fps, warehouse, robots):
     font = pygame.font.SysFont(None, 48)
-    small_font = pygame.font.SysFont(None, 36)
+    small_font = pygame.font.SysFont(None, 30)  # smaller to fit results
+
     waiting = True
     while waiting:
         screen.fill((255, 255, 255))
-        screen.blit(font.render("Simulation Finished!", True, (0, 0, 0)), (cols * tile_size + 10, 200))
-        screen.blit(small_font.render("Press R to Re-run", True, (0, 0, 0)), (cols * tile_size + 10, 300))
-        screen.blit(small_font.render("Press Q to Quit", True, (0, 0, 0)), (cols * tile_size + 10, 350))
+
+        # Title
+        screen.blit(font.render("Simulation Completed!", True, (0, 0, 0)), (cols * tile_size + 10, 50))
+
+        # Summary Results
+        result_texts = [
+            f"Total Steps: {frame_count}",
+            f"Total Real Time: {frame_count / fps:.2f} sec",
+            f"Total Items Delivered: {warehouse.items_delivered}"
+        ]
+        y_offset = 120
+        for line in result_texts:
+            screen.blit(small_font.render(line, True, (0, 0, 0)), (cols * tile_size + 10, y_offset))
+            y_offset += 35
+
+        # Robot-specific Results
+        for idx, robot in enumerate(robots):
+            robot_info = f"Robot {idx + 1} - Pickups: {robot.pickup_count}, Deliveries: {robot.shelf_delivery_count}"
+            screen.blit(small_font.render(robot_info, True, (0, 0, 0)), (cols * tile_size + 10, y_offset))
+            y_offset += 30
+
+        # Restart/Quit instructions
+        screen.blit(font.render("Press R to Re-run", True, (0, 0, 0)), (cols * tile_size + 10, y_offset + 40))
+        screen.blit(font.render("Press Q to Quit", True, (0, 0, 0)), (cols * tile_size + 10, y_offset + 100))
 
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     waiting = False
@@ -93,6 +116,7 @@ def show_restart_menu(screen, clock):
 
         pygame.display.flip()
         clock.tick(60)
+
 
 
 # --- Main Simulation ---
@@ -178,6 +202,34 @@ def main():
             for txt, y in info:
                 screen.blit(font.render(txt, True, (0, 0, 0)), (cols * tile_size + 10, y))
 
+            # --- Draw loading bar at TOP of right panel if finish timer started ---
+            if finish_timer_started:
+                elapsed = time.time() - finish_timer_start_time
+                progress = min(elapsed / 5, 1)
+
+                # Position for top-right loading bar
+                bar_x = cols * tile_size + 10
+                bar_y = 10
+                total_bar_width = info_panel_width - 150  # Make bar shorter to leave space for text
+                bar_width = int(total_bar_width * progress)
+                bar_height = 10
+
+                # Draw background gray bar
+                pygame.draw.rect(screen, (200, 200, 200), (bar_x, bar_y, total_bar_width, bar_height))
+                # Draw green progress bar
+                pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, bar_width, bar_height))
+
+                # Draw countdown text to the right of the bar
+                remaining_time = max(0, 5 - elapsed)
+                countdown_text = f"Ending in {remaining_time:.1f} sec"
+                countdown_surface = font.render(countdown_text, True, (255, 0, 0))
+
+                # Draw text right after the bar
+                text_x = bar_x + total_bar_width + 10  # Little gap
+                text_y = bar_y - 5  # Align nicely vertically
+
+                screen.blit(countdown_surface, (text_x, text_y))
+
             y_offset = 230
             for idx, robot in enumerate(robots):
                 screen.blit(font.render(f"Robot {idx + 1}: {robot.status_text}", True, (0, 0, 0)),
@@ -197,12 +249,12 @@ def main():
             pygame.display.flip()
 
             # --- Simulation Finish Check ---
-            all_standby = all(r.phase == 'standby' for r in robots)
-            no_more_work = warehouse.pickup_items_count() == 0 and warehouse.live_items_in_shelves() == 0
+            if running_mode == 1 or running_mode == 2:
+                if not finish_timer_started:
+                    all_standby = all(r.phase == 'standby' for r in robots)
+                    no_more_work = warehouse.pickup_items_count() == 0 and warehouse.live_items_in_shelves() == 0
 
-            if running_mode == 1:
-                if warehouse.items_delivered >= 60 and all_standby and no_more_work:
-                    if not finish_timer_started:
+                    if all_standby and no_more_work:
                         finish_timer_started = True
                         finish_timer_start_time = time.time()
                         print(f"[{frame_count / fps:.1f}s] Finish Timer: STARTED")
@@ -210,38 +262,12 @@ def main():
                 if finish_timer_started and (time.time() - finish_timer_start_time >= 5):
                     simulation_done = True
 
-            elif running_mode == 2:
-                if warehouse.items_delivered >= 60:
-                    simulation_done = True
-
             elif running_mode == 3:
                 if stop_pressed:
                     simulation_done = True
 
-        # --- Final results ---
-        screen.fill((255, 255, 255))
-        font_big = pygame.font.SysFont(None, 60)
-        font_small = pygame.font.SysFont(None, 40)
-        results = [
-            f"Simulation Completed!",
-            f"Total Steps: {frame_count}",
-            f"Total Real Time: {frame_count / fps:.2f} seconds",
-            f"Total Items Delivered: {warehouse.items_delivered}"
-        ]
-        y_offset = 100
-        for line in results:
-            screen.blit(font_big.render(line, True, (0, 0, 0)), (100, y_offset))
-            y_offset += 80
-
-        for idx, robot in enumerate(robots):
-            robot_info = f"Robot {idx + 1} - Pickup to Shelf: {robot.pickup_count}, Shelf to Dropoff: {robot.shelf_delivery_count}"
-            screen.blit(font_small.render(robot_info, True, (0, 0, 0)), (100, y_offset))
-            y_offset += 50
-
-        pygame.display.flip()
-        pygame.time.delay(5000)
-
-        show_restart_menu(screen, clock)
+            if simulation_done:
+                show_restart_menu(screen, clock, frame_count, fps, warehouse, robots)
 
 
 if __name__ == "__main__":
