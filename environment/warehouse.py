@@ -11,11 +11,14 @@ class Warehouse:
         self.cols = cols
         self.shelves = []
         self.rest_places = []
-        self.items = {}
+        self.items = {}  # Dict (shelf pos -> True/False)
         self.items_delivered = 0
 
     def place_initial_items(self, num_items):
-        pass
+        available_shelves = self.shelves.copy()
+        random.shuffle(available_shelves)
+        for shelf in available_shelves[:num_items]:
+            self.items[shelf] = True
 
     def draw(self, robots):
         for i in range(self.rows):

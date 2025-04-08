@@ -1,5 +1,6 @@
 from collections import deque
 import heapq
+import time
 
 class RobotAgent:
     def __init__(self, start_pos, color, pickup_point, dropoff_point, method='default'):
@@ -15,6 +16,12 @@ class RobotAgent:
         self.task_shelf = None
         self.status_text = "Idle"
 
+        # Resting related
+        self.items_handled = 0
+        self.need_rest = False
+        self.rest_target = None
+        self.rest_start_time = None
+
     def get_action(self, current_pos, warehouse, robots):
         if self.phase == 'pickup_from_source':
             goal = self.pickup_point
@@ -24,6 +31,8 @@ class RobotAgent:
             goal = self.task_shelf
         elif self.phase == 'deliver_to_dropoff':
             goal = self.dropoff_point
+        elif self.phase == 'going_to_rest' and self.rest_target:
+            goal = self.rest_target
         else:
             goal = None
 
@@ -68,14 +77,62 @@ class RobotAgent:
                 warehouse.items_delivered += 1
                 self.carrying_package = False
                 self.task_shelf = None
+                self.items_handled += 1
+
+                # Need to rest after every 5 items
+                if self.items_handled % 5 == 0:
+                    self.need_rest = True
+                    self.rest_target = self.find_nearest_rest_place(warehouse, robots)
+                    if self.rest_target:
+                        self.phase = 'going_to_rest'
+                        self.status_text = "Going to rest place..."
+                    else:
+                        self.phase = 'pickup_from_source'
+                        self.status_text = "No rest available, continue working"
+                else:
+                    self.phase = 'pickup_from_source'
+                    self.status_text = "Delivered, going to Pickup Point"
+
+        elif self.phase == 'going_to_rest':
+            if self.rest_target is None or self.rest_target_occupied(warehouse, robots):
+                self.rest_target = self.find_nearest_rest_place(warehouse, robots)
+
+            if self.rest_target and (self.x, self.y) == self.rest_target:
+                self.phase = 'resting'
+                self.rest_start_time = time.time()
+                self.status_text = "Resting..."
+
+        elif self.phase == 'resting':
+            if time.time() - self.rest_start_time >= 5:
+                self.need_rest = False
+                self.rest_target = None
+                self.rest_start_time = None
                 self.phase = 'pickup_from_source'
-                self.status_text = "Delivered, going to Pickup Point"
+                self.status_text = "Rest finished, going to Pickup Point"
+
+    def rest_target_occupied(self, warehouse, robots):
+        for r in robots:
+            if (r.x, r.y) == self.rest_target and r != self:
+                return True
+        return False
+
+    def find_nearest_rest_place(self, warehouse, robots):
+        occupied = {(r.x, r.y) for r in robots}
+        available = [place for place in warehouse.rest_places if place not in occupied]
+
+        if not available:
+            return None
+
+        def manhattan(p1, p2):
+            return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+
+        current_pos = (self.x, self.y)
+        available.sort(key=lambda pos: manhattan(current_pos, pos))
+        return available[0]
 
     def search(self, start, goal, warehouse, robots):
         if self.method == 'bfs':
             return self.bfs(start, goal, warehouse, robots)
-        elif self.method == 'dfs':
-            return self.dfs(start, goal, warehouse, robots)
         elif self.method == 'greedy':
             return self.greedy(start, goal, warehouse, robots)
         elif self.method == 'astar':
@@ -97,22 +154,6 @@ class RobotAgent:
             for neighbor in warehouse.get_neighbors(current, robot_phase=self.phase):
                 if neighbor not in visited and not warehouse.is_occupied(neighbor, robots):
                     queue.append((neighbor, path + [neighbor]))
-                    visited.add(neighbor)
-        return []
-
-    def dfs(self, start, goal, warehouse, robots):
-        stack = [(start, [])]
-        visited = set()
-        visited.add(start)
-
-        while stack:
-            (current, path) = stack.pop()
-            if current == goal:
-                return path
-
-            for neighbor in warehouse.get_neighbors(current, robot_phase=self.phase):
-                if neighbor not in visited and not warehouse.is_occupied(neighbor, robots):
-                    stack.append((neighbor, path + [neighbor]))
                     visited.add(neighbor)
         return []
 
