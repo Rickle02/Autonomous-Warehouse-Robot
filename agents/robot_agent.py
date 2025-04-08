@@ -1,3 +1,4 @@
+import random
 from collections import deque
 import heapq
 import time
@@ -18,7 +19,6 @@ class RobotAgent:
         self.status_text = "Idle"
 
         self.items_handled = 0
-        self.need_rest = False
         self.rest_target = None
         self.rest_start_time = None
 
@@ -31,8 +31,9 @@ class RobotAgent:
 
         if self.phase == 'going_to_rest' and self.rest_target:
             if (self.x, self.y) == self.rest_target:
-                self.phase = 'resting'
-                self.status_text = "Resting (done)."
+                self.phase = 'charging'
+                self.rest_start_time = time.time()
+                self.status_text = "Charging at rest place..."
                 return current_pos
             else:
                 path = self.search(current_pos, self.rest_target, warehouse, robots)
@@ -41,6 +42,7 @@ class RobotAgent:
                 else:
                     return current_pos
 
+        goal = None
         if self.phase == 'pickup_from_source':
             goal = self.pickup_point
         elif self.phase == 'store_in_shelf' and self.target_shelf:
@@ -49,10 +51,6 @@ class RobotAgent:
             goal = self.task_shelf
         elif self.phase == 'deliver_to_dropoff':
             goal = self.dropoff_point
-        elif self.phase == 'going_to_rest' and self.rest_target:
-            goal = self.rest_target
-        else:
-            goal = None
 
         if goal:
             path = self.search(current_pos, goal, warehouse, robots)
@@ -65,13 +63,15 @@ class RobotAgent:
 
         if self.phase == 'pickup_from_source':
             if warehouse.pickup_items_count() == 0 and warehouse.live_items_in_shelves() == 0:
-                self.rest_target = self.find_nearest_rest_place(warehouse, robots)
+                self.rest_target = self.find_rest_place_for_charging(warehouse, robots)
                 if self.rest_target:
                     self.phase = 'going_to_rest'
-                    self.status_text = "No work. Going to rest."
+                    self.rest_start_time = None
+                    self.status_text = "No work. Moving to rest place..."
                 else:
-                    self.phase = 'done'
-                    self.status_text = "No work and no rest place. Done."
+                    self.phase = 'charging'
+                    self.rest_start_time = time.time()
+                    self.status_text = "No work and no path. Charging here..."
                 return
 
             if warehouse.pickup_items_count() == 0 and warehouse.live_items_in_shelves() > 0:
@@ -99,7 +99,7 @@ class RobotAgent:
                     self.target_shelf = warehouse.find_empty_shelf()
                     if self.target_shelf:
                         self.phase = 'store_in_shelf'
-                        self.status_text = f"Picked from P, storing at {self.target_shelf}"
+                        self.status_text = f"Picked from Pickup, storing at {self.target_shelf}"
                         self.pickup_count += 1
                     else:
                         self.status_text = "No empty shelf!"
@@ -119,13 +119,15 @@ class RobotAgent:
 
         elif self.phase == 'pickup_from_shelf':
             if warehouse.live_items_in_shelves() == 0 and warehouse.pickup_items_count() == 0:
-                self.rest_target = self.find_nearest_rest_place(warehouse, robots)
+                self.rest_target = self.find_rest_place_for_charging(warehouse, robots)
                 if self.rest_target:
                     self.phase = 'going_to_rest'
-                    self.status_text = "No shelves. No work. Going to rest."
+                    self.rest_start_time = None
+                    self.status_text = "No shelves. Moving to rest place..."
                 else:
-                    self.phase = 'done'
-                    self.status_text = "No shelves and no rest place. Done."
+                    self.phase = 'charging'
+                    self.rest_start_time = time.time()
+                    self.status_text = "No shelves and no rest path. Charging..."
                 return
 
             if self.task_shelf and not warehouse.items.get(self.task_shelf, False):
@@ -134,16 +136,7 @@ class RobotAgent:
                     warehouse.reserve_item(self.task_shelf, id(self))
                     self.status_text = f"Reassigned: Taking from {self.task_shelf}"
                 else:
-                    if self.running_mode in [2, 3]:
-                        self.rest_target = self.find_nearest_rest_place(warehouse, robots)
-                        if self.rest_target:
-                            self.phase = 'going_to_rest'
-                            self.status_text = "No available shelves, going to rest."
-                        else:
-                            self.phase = 'done'
-                            self.status_text = "No shelves and no rest place. Done."
-                    else:
-                        self.status_text = "Waiting for new task"
+                    self.status_text = "Waiting for new task"
                 return
 
             if self.task_shelf and (self.x, self.y) == self.task_shelf:
@@ -161,60 +154,85 @@ class RobotAgent:
                 self.shelf_delivery_count += 1
 
                 if self.running_mode in [2, 3] and self.items_handled % 5 == 0:
-                    self.need_rest = True
-                    self.rest_target = self.find_nearest_rest_place(warehouse, robots)
+                    self.rest_target = self.find_rest_place_for_charging(warehouse, robots)
                     if self.rest_target:
                         self.phase = 'going_to_rest'
-                        self.status_text = "Going to rest place..."
+                        self.rest_start_time = None
+                        self.status_text = "5 deliveries done. Moving to rest place..."
                     else:
-                        self.phase = 'pickup_from_source'
-                        self.status_text = "No rest available, continue working"
+                        self.phase = 'charging'
+                        self.rest_start_time = time.time()
+                        self.status_text = "5 deliveries done. Charging here..."
                 else:
                     if warehouse.pickup_items_count() == 0 and warehouse.live_items_in_shelves() == 0:
-                        self.rest_target = self.find_nearest_rest_place(warehouse, robots)
+                        self.rest_target = self.find_rest_place_for_charging(warehouse, robots)
                         if self.rest_target:
                             self.phase = 'going_to_rest'
-                            self.status_text = "No more work. Going to rest."
+                            self.rest_start_time = None
+                            self.status_text = "No more work. Moving to rest place..."
                         else:
-                            self.phase = 'done'
-                            self.status_text = "No work and no rest place. Done."
+                            self.phase = 'charging'
+                            self.rest_start_time = time.time()
+                            self.status_text = "No work. Charging here..."
                     else:
                         self.phase = 'pickup_from_source'
-                        self.status_text = "Delivered, going to Pickup Point"
+                        self.status_text = "Delivered. Going to Pickup Point."
 
         elif self.phase == 'going_to_rest':
             if self.rest_target is None or self.rest_target_occupied(warehouse, robots):
-                self.rest_target = self.find_nearest_rest_place(warehouse, robots)
+                self.rest_target = self.find_rest_place_for_charging(warehouse, robots)
 
-            if self.rest_target and (self.x, self.y) == self.rest_target:
-                self.phase = 'resting'
-                self.status_text = "Resting (done)."
+            if self.rest_target:
+                if (self.x, self.y) == self.rest_target:
+                    self.phase = 'charging'
+                    self.status_text = "Charging at rest place..."
+            else:
+                self.phase = 'charging'
+                self.rest_start_time = time.time()
+                self.status_text = "No path to rest place. Charging here."
 
-        elif self.phase == 'resting':
-            pass
+        elif self.phase == 'charging':
+            if self.rest_start_time is None:
+                self.rest_start_time = time.time()
+
+            elapsed = time.time() - self.rest_start_time
+
+            if elapsed >= 5:
+                if warehouse.pickup_items_count() > 0 or warehouse.live_items_in_shelves() > 0:
+                    self.phase = 'pickup_from_source'
+                    self.rest_target = None
+                    self.rest_start_time = None
+                    self.status_text = "Charging complete! New task available."
+                else:
+                    self.status_text = "Charging done. Waiting..."
+            else:
+                self.status_text = f"Charging... ({int(elapsed)} sec)"
 
     def check_and_update_mission(self, warehouse):
         pass
+
+    def find_rest_place_for_charging(self, warehouse, robots):
+        occupied = {(r.x, r.y) for r in robots}
+        available_places = [p for p in warehouse.rest_places if p not in occupied]
+
+        if not available_places:
+            return None
+
+        current_pos = (self.x, self.y)
+        random.shuffle(available_places)  # Randomize
+
+        for place in available_places:
+            path = self.search(current_pos, place, warehouse, robots)
+            if path and len(path) > 0:
+                return place
+
+        return None
 
     def rest_target_occupied(self, warehouse, robots):
         for r in robots:
             if (r.x, r.y) == self.rest_target and r != self:
                 return True
         return False
-
-    def find_nearest_rest_place(self, warehouse, robots):
-        occupied = {(r.x, r.y) for r in robots}
-        available = [place for place in warehouse.rest_places if place not in occupied]
-
-        if not available:
-            return None
-
-        def manhattan(p1, p2):
-            return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
-
-        current_pos = (self.x, self.y)
-        available.sort(key=lambda pos: manhattan(current_pos, pos))
-        return available[0]
 
     def search(self, start, goal, warehouse, robots):
         if self.method == 'bfs':

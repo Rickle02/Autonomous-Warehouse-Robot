@@ -63,10 +63,15 @@ class Warehouse:
             if 0 <= nx < self.rows and 0 <= ny < self.cols:
                 next_pos = (nx, ny)
 
+                # BLOCK shelf to shelf move
                 if pos in self.shelves and next_pos in self.shelves:
                     continue
-                if next_pos in self.shelves and robot_phase not in ['store_in_shelf', 'pickup_from_shelf']:
-                    continue
+
+                # BLOCK entering shelf unless allowed
+                if next_pos in self.shelves:
+                    if robot_phase not in ['store_in_shelf', 'pickup_from_shelf', 'going_to_rest', 'charging',
+                                           'resting']:
+                        continue  # normal robots can't go into shelf unless allowed
 
                 neighbors.append(next_pos)
         return neighbors
