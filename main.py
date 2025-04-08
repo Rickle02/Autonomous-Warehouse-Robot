@@ -1,13 +1,14 @@
 import pygame
 import sys
 import os
+import random
 from environment.warehouse import Warehouse
 from agents.robot_agent import RobotAgent
 
 # Settings
 tile_size = 40
 rows, cols = 15, 15
-info_panel_width = 200
+info_panel_width = 500
 fps = 5
 
 def load_layout(file_path):
@@ -112,7 +113,7 @@ def choose_search_method(screen, clock):
 
 def main():
     pygame.init()
-    window_width = cols * tile_size + info_panel_width
+    window_width = cols * tile_size + info_panel_width + 70  # Added 70 extra for cleaner right panel
     window_height = rows * tile_size
     screen = pygame.display.set_mode((window_width, window_height))
     pygame.display.set_caption("Warehouse Project 15x15")
@@ -127,32 +128,30 @@ def main():
         warehouse = Warehouse(screen, tile_size, pickup_point, dropoff_point, rows, cols)
         warehouse.shelves = shelves
         warehouse.rest_places = rest_places
+        warehouse.place_initial_items(0)  # Start with 0 packages now
 
         robots = []
-        robot_colors = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
-        for i in range(len(robot_colors)):
-            if i < len(rest_places):
-                robots.append(RobotAgent(rest_places[i], robot_colors[i], pickup_point, dropoff_point, method=search_method))
+        colors = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
+
+        for i in range(4):
+            start_pos = rest_places[i] if i < len(rest_places) else (0, 0)
+            robot = RobotAgent(start_pos, colors[i], pickup_point, dropoff_point, method=search_method)
+            robot.status_text = "Idle"
+            robots.append(robot)
 
         frame_count = 0
         running = True
 
         while running:
             clock.tick(fps)
-            all_done = all(robot.phase == 'done' for robot in robots)
-            if not all_done:
-                frame_count += 1
+            frame_count += 1
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type == pygame.KEYDOWN:
-                    if all_done and event.key == pygame.K_r:
-                        running = False
 
             screen.fill((255, 255, 255))
-
             robots_sorted = sorted(robots, key=lambda r: (r.x, r.y))
             planned_moves = {}
             occupied_positions = {(r.x, r.y) for r in robots}
@@ -172,25 +171,26 @@ def main():
                 robot.x, robot.y = next_pos
 
             for robot in robots:
-                robot.update_phase(warehouse)
+                robot.update_phase(warehouse, robots)
 
             warehouse.draw(robots)
 
-            pygame.draw.rect(screen, (255, 255, 255), (cols * tile_size, 0, info_panel_width, rows * tile_size))
+            pygame.draw.rect(screen, (255, 255, 255), (cols * tile_size, 0, info_panel_width + 70, rows * tile_size))
             font = pygame.font.SysFont(None, 30)
+
             steps_text = font.render(f"Steps: {frame_count}", True, (0, 0, 0))
             real_time_text = font.render(f"Real Time: {frame_count / fps:.2f} sec", True, (0, 0, 0))
-            items_delivered_text = font.render(f"Items Delivered: {4 - warehouse.packages_to_deliver}", True, (0, 0, 0))
+            items_delivered_text = font.render(f"Items Delivered: {warehouse.items_delivered}", True, (0, 0, 0))
 
             screen.blit(steps_text, (cols * tile_size + 10, 20))
             screen.blit(real_time_text, (cols * tile_size + 10, 60))
             screen.blit(items_delivered_text, (cols * tile_size + 10, 100))
 
-            if all_done:
-                done_text = font.render("Simulation Completed!", True, (0, 150, 0))
-                screen.blit(done_text, (cols * tile_size + 10, 140))
-                restart_text = font.render("Press R to Restart", True, (150, 0, 0))
-                screen.blit(restart_text, (cols * tile_size + 10, 180))
+            y_offset = 150
+            for idx, robot in enumerate(robots):
+                status = font.render(f"Robot {idx+1}: {robot.status_text}", True, (0, 0, 0))
+                screen.blit(status, (cols * tile_size + 10, y_offset))
+                y_offset += 40
 
             pygame.display.flip()
 

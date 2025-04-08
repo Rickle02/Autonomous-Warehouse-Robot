@@ -9,25 +9,21 @@ class RobotAgent:
         self.dropoff_point = dropoff_point
         self.method = method
 
-        self.phase = 'start'
-        self.task = None
+        self.phase = 'pickup_from_source'
         self.carrying_package = False
-        self.rest_place = start_pos
-        self.waiting = False
+        self.target_shelf = None
+        self.task_shelf = None
+        self.status_text = "Idle"
 
     def get_action(self, current_pos, warehouse, robots):
-        if self.phase == 'start':
-            return current_pos
-
-        if self.phase == 'pickup':
-            if warehouse.is_occupied(self.pickup_point, robots):
-                goal = self.find_waiting_spot(warehouse, robots)
-            else:
-                goal = self.pickup_point
-        elif self.phase == 'deliver':
+        if self.phase == 'pickup_from_source':
+            goal = self.pickup_point
+        elif self.phase == 'store_in_shelf' and self.target_shelf:
+            goal = self.target_shelf
+        elif self.phase == 'pickup_from_shelf' and self.task_shelf:
+            goal = self.task_shelf
+        elif self.phase == 'deliver_to_dropoff':
             goal = self.dropoff_point
-        elif self.phase == 'rest':
-            goal = self.rest_place
         else:
             goal = None
 
@@ -37,44 +33,43 @@ class RobotAgent:
                 return path[0]
         return current_pos
 
-    def find_waiting_spot(self, warehouse, robots):
-        queue = deque()
-        visited = set()
-        queue.append(self.pickup_point)
-        visited.add(self.pickup_point)
-
-        while queue:
-            current = queue.popleft()
-            for neighbor in warehouse.get_neighbors(current):
-                if neighbor not in visited:
-                    if not warehouse.is_occupied(neighbor, robots):
-                        return neighbor
-                    queue.append(neighbor)
-                    visited.add(neighbor)
-        return self.pickup_point
-
-    def update_phase(self, warehouse):
-        if self.phase == 'start':
-            self.phase = 'pickup'
-            return
-
-        if self.phase == 'pickup' and (self.x, self.y) == self.pickup_point:
-            if warehouse.packages_to_deliver > 0:
+    def update_phase(self, warehouse, robots):
+        if self.phase == 'pickup_from_source':
+            if (self.x, self.y) == self.pickup_point:
                 self.carrying_package = True
-                self.phase = 'deliver'
-            else:
-                self.phase = 'rest'
+                self.target_shelf = warehouse.find_empty_shelf()
+                if self.target_shelf:
+                    self.phase = 'store_in_shelf'
+                    self.status_text = f"Picked from P, storing at {self.target_shelf}"
+                else:
+                    self.status_text = "No empty shelf!"
 
-        elif self.phase == 'deliver' and (self.x, self.y) == self.dropoff_point:
-            self.carrying_package = False
-            warehouse.packages_to_deliver -= 1
-            if warehouse.packages_to_deliver == 0:
-                self.phase = 'rest'
-            else:
-                self.phase = 'pickup'
+        elif self.phase == 'store_in_shelf':
+            if (self.x, self.y) == self.target_shelf:
+                warehouse.store_item((self.x, self.y))
+                self.carrying_package = False
+                self.target_shelf = None
+                self.phase = 'pickup_from_shelf'
+                self.task_shelf = warehouse.find_filled_shelf()
+                if self.task_shelf:
+                    self.status_text = f"Order: Take from {self.task_shelf}"
+                else:
+                    self.status_text = "Waiting for order"
 
-        elif self.phase == 'rest' and (self.x, self.y) == self.rest_place:
-            self.phase = 'done'
+        elif self.phase == 'pickup_from_shelf':
+            if self.task_shelf and (self.x, self.y) == self.task_shelf:
+                warehouse.remove_item((self.x, self.y))
+                self.carrying_package = True
+                self.phase = 'deliver_to_dropoff'
+                self.status_text = f"Picked from shelf {self.task_shelf}, delivering"
+
+        elif self.phase == 'deliver_to_dropoff':
+            if (self.x, self.y) == self.dropoff_point:
+                warehouse.items_delivered += 1
+                self.carrying_package = False
+                self.task_shelf = None
+                self.phase = 'pickup_from_source'
+                self.status_text = "Delivered, going to Pickup Point"
 
     def search(self, start, goal, warehouse, robots):
         if self.method == 'bfs':
@@ -99,7 +94,7 @@ class RobotAgent:
             if current == goal:
                 return path
 
-            for neighbor in warehouse.get_neighbors(current):
+            for neighbor in warehouse.get_neighbors(current, robot_phase=self.phase):
                 if neighbor not in visited and not warehouse.is_occupied(neighbor, robots):
                     queue.append((neighbor, path + [neighbor]))
                     visited.add(neighbor)
@@ -115,7 +110,7 @@ class RobotAgent:
             if current == goal:
                 return path
 
-            for neighbor in warehouse.get_neighbors(current):
+            for neighbor in warehouse.get_neighbors(current, robot_phase=self.phase):
                 if neighbor not in visited and not warehouse.is_occupied(neighbor, robots):
                     stack.append((neighbor, path + [neighbor]))
                     visited.add(neighbor)
@@ -131,7 +126,7 @@ class RobotAgent:
             if current == goal:
                 return path
 
-            for neighbor in warehouse.get_neighbors(current):
+            for neighbor in warehouse.get_neighbors(current, robot_phase=self.phase):
                 if neighbor not in visited and not warehouse.is_occupied(neighbor, robots):
                     heapq.heappush(heap, (self.heuristic(neighbor, goal), neighbor, path + [neighbor]))
                     visited.add(neighbor)
@@ -147,7 +142,7 @@ class RobotAgent:
             if current == goal:
                 return path
 
-            for neighbor in warehouse.get_neighbors(current):
+            for neighbor in warehouse.get_neighbors(current, robot_phase=self.phase):
                 if neighbor not in visited and not warehouse.is_occupied(neighbor, robots):
                     new_g = g + 1
                     new_f = new_g + self.heuristic(neighbor, goal)
