@@ -3,7 +3,8 @@ import heapq
 import time
 
 class RobotAgent:
-    def __init__(self, start_pos, color, pickup_point, dropoff_point, method='default'):
+    def __init__(self, start_pos, color, pickup_point, dropoff_point, method='default', running_mode=1):
+        self.running_mode = running_mode
         self.x, self.y = start_pos
         self.color = color
         self.pickup_point = pickup_point
@@ -21,6 +22,10 @@ class RobotAgent:
         self.need_rest = False
         self.rest_target = None
         self.rest_start_time = None
+
+        # Tracking counts
+        self.pickup_count = 0  # From pickup to shelf
+        self.shelf_delivery_count = 0  # From shelf to dropoff
 
     def get_action(self, current_pos, warehouse, robots):
         if self.phase == 'pickup_from_source':
@@ -44,14 +49,24 @@ class RobotAgent:
 
     def update_phase(self, warehouse, robots):
         if self.phase == 'pickup_from_source':
-            if (self.x, self.y) == self.pickup_point:
+            if warehouse.find_empty_shelf() is None:
+                # NO empty shelves! Wait or help clear shelves
+                self.phase = 'pickup_from_shelf'
+                self.task_shelf = warehouse.find_filled_shelf()
+                if self.task_shelf:
+                    self.status_text = f"No empty shelf! Taking from {self.task_shelf}"
+                else:
+                    self.status_text = "No empty shelf! Waiting..."
+            elif (self.x, self.y) == self.pickup_point:
                 self.carrying_package = True
                 self.target_shelf = warehouse.find_empty_shelf()
                 if self.target_shelf:
                     self.phase = 'store_in_shelf'
                     self.status_text = f"Picked from P, storing at {self.target_shelf}"
+                    self.pickup_count += 1
                 else:
                     self.status_text = "No empty shelf!"
+
 
         elif self.phase == 'store_in_shelf':
             if (self.x, self.y) == self.target_shelf:
@@ -78,9 +93,10 @@ class RobotAgent:
                 self.carrying_package = False
                 self.task_shelf = None
                 self.items_handled += 1
+                self.shelf_delivery_count += 1
 
                 # Need to rest after every 5 items
-                if self.items_handled % 5 == 0:
+                if self.running_mode in [2, 3] and self.items_handled % 5 == 0:
                     self.need_rest = True
                     self.rest_target = self.find_nearest_rest_place(warehouse, robots)
                     if self.rest_target:
