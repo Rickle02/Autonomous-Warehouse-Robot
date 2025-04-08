@@ -204,7 +204,10 @@ class RobotAgent:
                     self.rest_start_time = None
                     self.status_text = "Charging complete! New task available."
                 else:
-                    self.status_text = "Charging done. Waiting..."
+                    self.phase = 'standby'
+                    self.rest_target = None
+                    self.rest_start_time = None
+                    self.status_text = "Charging done. Standing by."
             else:
                 self.status_text = f"Charging... ({int(elapsed)} sec)"
 
