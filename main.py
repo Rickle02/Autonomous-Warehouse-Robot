@@ -43,8 +43,8 @@ def choose_search_method(screen, clock):
 
 def choose_running_mode(screen, clock):
     return show_option_menu(screen, clock, "Choose Running Mode", [
-        "Press 1 for 30+30 Items (No Rest)",
-        "Press 2 for 60 Items (With Rest)",
+        "Press 1 for 30 Items in Shelves (No Rest)",
+        "Press 2 for 60 Items in Shelves, 60 Item for Pickup (With Rest)",
         "Press 3 for Unlimited Items (With Rest)"
     ], [1, 2, 3])
 
@@ -141,9 +141,14 @@ def main():
         if running_mode == 1:
             warehouse.place_initial_items(30)
         elif running_mode == 2:
-            warehouse.place_initial_items(len(warehouse.shelves))
+            # warehouse.place_initial_items(len(warehouse.shelves))
+            warehouse.place_initial_items(60)
+            for _ in range(60):
+                warehouse.pickup_queue.append("Item")
         else:
-            warehouse.place_initial_items(0)
+            warehouse.place_initial_items(10)
+            for _ in range(10):
+                warehouse.pickup_queue.append("Item")
 
         robots = []
         for i, color in enumerate([(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]):
@@ -189,6 +194,11 @@ def main():
                 robot.update_phase(warehouse, robots)
 
             warehouse.draw(robots)
+
+            # --- Mode 3: Continuously add pickup items ---
+            if running_mode == 3:
+                if frame_count % (fps * 3) == 0:  # Every 3 seconds
+                    warehouse.pickup_queue.append("Item")
 
             # Info panel
             pygame.draw.rect(screen, (255, 255, 255), (cols * tile_size, 0, info_panel_width + 70, rows * tile_size))
