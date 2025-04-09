@@ -1,7 +1,6 @@
 import pygame
 import sys
 import os
-import random
 import time
 from environment.warehouse import Warehouse
 from agents.robot_agent import RobotAgent
@@ -141,7 +140,6 @@ def main():
         if running_mode == 1:
             warehouse.place_initial_items(30)
         elif running_mode == 2:
-            # warehouse.place_initial_items(len(warehouse.shelves))
             warehouse.place_initial_items(60)
             for _ in range(60):
                 warehouse.pickup_queue.append("Item")
@@ -161,15 +159,24 @@ def main():
         simulation_done = False
         finish_timer_started = False
         finish_timer_start_time = None
+        scroll_offset = 0
 
         while not simulation_done:
             clock.tick(fps)
             frame_count += 1
 
             for event in pygame.event.get():
-                if event.type == pygame.QUIT: pygame.quit(); sys.exit()
-                if running_mode == 3 and event.type == pygame.MOUSEBUTTONDOWN:
-                    if pygame.Rect(cols * tile_size + 350, 20, 100, 40).collidepoint(event.pos):
+                if event.type == pygame.QUIT:
+                    pygame.quit(); sys.exit()
+
+                # --- Scroll mouse up/down ---
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 4:  # scroll up
+                        scroll_offset = max(scroll_offset - 20, 0)
+                    if event.button == 5:  # scroll down
+                        scroll_offset += 20
+
+                    if running_mode == 3 and pygame.Rect(cols * tile_size + 350, 20, 100, 40).collidepoint(event.pos):
                         stop_pressed = True
 
             screen.fill((255, 255, 255))
@@ -197,7 +204,7 @@ def main():
 
             # --- Mode 3: Continuously add pickup items ---
             if running_mode == 3:
-                if frame_count % (fps * 3) == 0:  # Every 3 seconds
+                if frame_count % (fps * 3) == 0:
                     warehouse.pickup_queue.append("Item")
 
             # Info panel
@@ -210,37 +217,32 @@ def main():
                 (f"Live Items in Shelves: {warehouse.count_live_items()}", 180)
             ]
             for txt, y in info:
-                screen.blit(font.render(txt, True, (0, 0, 0)), (cols * tile_size + 10, y))
+                screen.blit(font.render(txt, True, (0, 0, 0)), (cols * tile_size + 10, y - scroll_offset))  # <--- scroll!!
 
             # --- Draw loading bar at TOP of right panel if finish timer started ---
             if finish_timer_started:
                 elapsed = time.time() - finish_timer_start_time
                 progress = min(elapsed / 5, 1)
 
-                # Position for top-right loading bar
                 bar_x = cols * tile_size + 10
                 bar_y = 10
-                total_bar_width = info_panel_width - 150  # Make bar shorter to leave space for text
+                total_bar_width = info_panel_width - 150
                 bar_width = int(total_bar_width * progress)
                 bar_height = 10
 
-                # Draw background gray bar
                 pygame.draw.rect(screen, (200, 200, 200), (bar_x, bar_y, total_bar_width, bar_height))
-                # Draw green progress bar
                 pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, bar_width, bar_height))
 
-                # Draw countdown text to the right of the bar
                 remaining_time = max(0, 5 - elapsed)
                 countdown_text = f"Ending in {remaining_time:.1f} sec"
                 countdown_surface = font.render(countdown_text, True, (255, 0, 0))
 
-                # Draw text right after the bar
-                text_x = bar_x + total_bar_width + 10  # Little gap
-                text_y = bar_y - 5  # Align nicely vertically
+                text_x = bar_x + total_bar_width + 10
+                text_y = bar_y - 5
 
                 screen.blit(countdown_surface, (text_x, text_y))
 
-            y_offset = 230
+            y_offset = 230 - scroll_offset  # <<--- scroll!!
             for idx, robot in enumerate(robots):
                 screen.blit(font.render(f"Robot {idx + 1}: {robot.status_text}", True, (0, 0, 0)),
                             (cols * tile_size + 10, y_offset))
@@ -278,6 +280,7 @@ def main():
 
             if simulation_done:
                 show_restart_menu(screen, clock, frame_count, fps, warehouse, robots)
+
 
 
 if __name__ == "__main__":
