@@ -1,3 +1,5 @@
+import random
+
 import pygame
 import sys
 import os
@@ -204,8 +206,12 @@ def main():
 
             # --- Mode 3: Continuously add pickup items ---
             if running_mode == 3:
-                if frame_count % (fps * 3) == 0:
-                    warehouse.pickup_queue.append("Item")
+                # Simulate a truck arriving at random intervals (every 5–10 seconds)
+                if frame_count % (fps * random.randint(5,10)) == 0:
+                    num_items = random.randint(5, 10)  # Each truck brings 5–10 items
+                    print(f"Truck arrived with {num_items} items")
+                    for _ in range(num_items):
+                        warehouse.pickup_queue.append("Item")
 
             # Info panel
             pygame.draw.rect(screen, (255, 255, 255), (cols * tile_size, 0, info_panel_width + 70, rows * tile_size))
